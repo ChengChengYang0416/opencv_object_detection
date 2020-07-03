@@ -43,6 +43,8 @@ fy = msg.P[5]
 cx = msg.P[2]
 cy = msg.P[6]
 
+depth = []
+
 def main():
     useHSV   = True
     useDepth = True
@@ -57,10 +59,31 @@ def main():
             #    Subscribe to both RGB and Depth images with a Synchronizer
             image_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
             depth_sub = message_filters.Subscriber("/camera/aligned_depth_to_color/image_raw", Image)
+            rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, callback=convert_depth_image, queue_size=1)
             ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub], 10, 0.5)
             ts.registerCallback(rosRGBDCallBack)
 
     rospy.spin()
+
+def convert_depth_image(ros_image):
+
+    bridge = CvBridge()
+    # Use cv_bridge() to convert the ROS image to OpenCV format
+    try:
+    #Convert the depth image using the default passthrough encoding
+        depth_image = cv_bridge.imgmsg_to_cv2(ros_image, desired_encoding='passthrough')
+
+    except CvBridgeError, e:
+ 	    print e
+    #Convert the depth image to a Numpy array
+    depth_array = np.array(depth_image, dtype=np.float32)
+    
+    #print(depth_array[0][0])
+    #print(depth_array)
+    global depth
+    depth = depth_array.copy()
+
+    #rospy.loginfo(depth_array)
 
 
 def rosImageVizCallback(msg):
@@ -338,6 +361,9 @@ def rosRGBDCallBack(rgb_data, depth_data):
                 cv2.line(cv_image, (cX_blue, cY_blue), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
                 cv2.line(cv_image, (cX_blue, cY_blue), (cX_blue, cY_blue-100), (255,0,0), 3)             # z-axis
                 cv2.line(cv_image, (cX_blue, cY_blue), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
+            cZ_blue = depth[cX_blue][cY_blue]
+            xyz_blue = getXYZ(cX_blue, cY_blue, cZ_blue, fx, fy, cx, cy)
+            print(xyz_blue)
             ###################################################################
 
             if detect_shape:
