@@ -28,6 +28,7 @@ vis_pub = rospy.Publisher('/visualization_marker', Marker, queue_size=10)
 mask_eroded_pub = rospy.Publisher('/object_detection/mask_eroded', Image, queue_size=10)
 mask_ero_dil_pub = rospy.Publisher('/object_detection/mask_eroded_dilated', Image, queue_size=10)
 img_result_pub = rospy.Publisher('/object_detection/img_result', Image, queue_size=10)
+robot_command_pub = rospy.Publisher('/robot_command', Pose, queue_size=10)
 
 # Bridge to convert ROS Image type to OpenCV Image type
 cv_bridge = CvBridge()
@@ -363,7 +364,17 @@ def rosRGBDCallBack(rgb_data, depth_data):
                 cv2.line(cv_image, (cX_blue, cY_blue), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
             cZ_blue = depth[cX_blue][cY_blue]
             xyz_blue = getXYZ(cX_blue, cY_blue, cZ_blue, fx, fy, cx, cy)
-            print(xyz_blue)
+            #print(xyz_blue)
+            command = Pose()
+            command.position.x = xyz_blue[0]
+            command.position.y = xyz_blue[1]
+            command.position.z = xyz_blue[2]
+            command.orientation.x = 0
+            command.orientation.y = 0.707
+            command.orientation.z = 0
+            command.orientation.w = 0.707
+            print(command)
+            robot_command_pub.publish(command)
             ###################################################################
 
             if detect_shape:
