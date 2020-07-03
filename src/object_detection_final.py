@@ -190,8 +190,30 @@ def rosRGBDCallBack(rgb_data, depth_data):
             extRight = tuple(c[c[:, :, 0].argmax()][0])
             #cv2.circle(cv_image, extRight, 5, (0, 255, 0), -1)
 
-            #ellipse = cv2.fitEllipse(cnt)
-            #cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
+            #if (len(cnt) >= 5):
+                #ellipse = cv2.fitEllipse(cnt)
+                #cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
+
+            if (len(cnt) >= 5):
+                ellipse = cv2.fitEllipse(cnt)
+                cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
+
+                (x,y),(MA,ma),angle = cv2.fitEllipse(cnt)
+                if (angle >= 90) and (angle <= 180):
+                    angle = angle - 90
+                    ell_x = int(x + 40*math.cos(angle*0.0174532925))
+                    ell_y = int(y + 40*math.sin(angle*0.0174532925))
+                    ell_x_short = int(x + 40*math.sin(angle*0.0174532925))
+                    ell_y_short = int(y - 40*math.cos(angle*0.0174532925))
+                else :
+                    ell_x = int(x + 40*math.sin(angle*0.0174532925))
+                    ell_y = int(y - 40*math.cos(angle*0.0174532925))
+                    ell_x_short = int(x - 40*math.cos(angle*0.0174532925))
+                    ell_y_short = int(y - 40*math.sin(angle*0.0174532925))
+
+                cv2.line(cv_image, (cX_red, cY_red), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
+                cv2.line(cv_image, (cX_red, cY_red), (cX_red, cY_red-40), (255,0,0), 3)             # z-axis
+                cv2.line(cv_image, (cX_red, cY_red), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
             ###################################################################
 
             if detect_shape:
@@ -296,19 +318,26 @@ def rosRGBDCallBack(rgb_data, depth_data):
             extRight = tuple(c[c[:, :, 0].argmax()][0])
             #cv2.circle(cv_image, extRight, 5, (0, 255, 0), -1)
 
-            ellipse = cv2.fitEllipse(cnt)
-            cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
-            
-            (x,y),(MA,ma),angle = cv2.fitEllipse(cnt)
-            ell_x = int(x - (100)*math.sin(angle))
-            ell_y = int(y + (100)*math.cos(angle))
-            ell_x_short = int(x + 100*math.cos(angle))
-            ell_y_short = int(y - 100*math.cos(angle))
+            if (len(cnt) >= 5):
+                ellipse = cv2.fitEllipse(cnt)
+                cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
 
-            cv2.circle(cv_image, (ell_x, ell_y), 5, (0, 255, 0), -1)
-            cv2.line(cv_image, (cX_blue, cY_blue), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
-            cv2.line(cv_image, (cX_blue, cY_blue), (cX_blue, cY_blue-50), (255,0,0), 3)             # z-axis
-            cv2.line(cv_image, (cX_blue, cY_blue), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
+                (x,y),(MA,ma),angle = cv2.fitEllipse(cnt)
+                if (angle >= 90) and (angle <= 180):
+                    angle = angle - 90
+                    ell_x = int(x + 100*math.cos(angle*0.0174532925))
+                    ell_y = int(y + 100*math.sin(angle*0.0174532925))
+                    ell_x_short = int(x + 100*math.sin(angle*0.0174532925))
+                    ell_y_short = int(y - 100*math.cos(angle*0.0174532925))
+                else :
+                    ell_x = int(x + 100*math.sin(angle*0.0174532925))
+                    ell_y = int(y - 100*math.cos(angle*0.0174532925))
+                    ell_x_short = int(x - 100*math.cos(angle*0.0174532925))
+                    ell_y_short = int(y - 100*math.sin(angle*0.0174532925))
+
+                cv2.line(cv_image, (cX_blue, cY_blue), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
+                cv2.line(cv_image, (cX_blue, cY_blue), (cX_blue, cY_blue-100), (255,0,0), 3)             # z-axis
+                cv2.line(cv_image, (cX_blue, cY_blue), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
             ###################################################################
 
             if detect_shape:
@@ -413,8 +442,10 @@ def rosRGBDCallBack(rgb_data, depth_data):
             extRight = tuple(c[c[:, :, 0].argmax()][0])
             #cv2.circle(cv_image, extRight, 5, (0, 255, 0), -1)
 
-            #ellipse = cv2.fitEllipse(cnt)
-            #cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
+            if (len(cnt) >= 5):
+                ellipse = cv2.fitEllipse(cnt)
+                cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
+
             cv2.line(cv_image, (cX_green, cY_green), (cX_green+30, cY_green-15), (0,0,255), 3)
             cv2.line(cv_image, (cX_green, cY_green), (cX_green+30, cY_green), (0,255,0), 3)
             cv2.line(cv_image, (cX_green, cY_green), (cX_green, cY_green-30), (255,0,0), 3)     
