@@ -7,7 +7,6 @@
 import rospy
 import numpy as np
 import cv2  # OpenCV module
-import imutils
 import math
 
 from sensor_msgs.msg import Image, CameraInfo
@@ -18,6 +17,7 @@ from std_msgs.msg import ColorRGBA
 from cv_bridge import CvBridge, CvBridgeError
 import message_filters
 import math
+from tf.transformations import quaternion_matrix
 
 rospy.init_node('object_detection', anonymous=True)
 
@@ -134,39 +134,22 @@ def HSVObjectDetection(cv_image, toPrint = True):
     upper_green = np.array([100, 255, 255])
 
     # Threshold the HSV image to get only red colors
-    mask = cv2.inRange(hsv_image, lower_red, upper_red)
     mask_blue = cv2.inRange(hsv_image, lower_blue, upper_blue)
-    mask_green = cv2.inRange(hsv_image, lower_green, upper_green)
 
-    mask_eroded = cv2.erode(mask, None, iterations = 3)
-    mask_eroded_dilated = cv2.dilate(mask_eroded, None, iterations = 3)
     mask_eroded_blue = cv2.erode(mask_blue, None, iterations = 3)
     mask_eroded_dilated_blue = cv2.dilate(mask_eroded_blue, None, iterations = 3)
-    mask_eroded_green = cv2.erode(mask_green, None, iterations = 3)
-    mask_eroded_dilated_green = cv2.dilate(mask_eroded_green, None, iterations = 3)
 
-    mask_eroded_pub.publish(cv_bridge.cv2_to_imgmsg(mask_eroded,
+    mask_eroded_pub.publish(cv_bridge.cv2_to_imgmsg(mask_eroded_blue,
         encoding="passthrough"))
-    mask_ero_dil_pub.publish(cv_bridge.cv2_to_imgmsg(mask_eroded_dilated,
+    mask_ero_dil_pub.publish(cv_bridge.cv2_to_imgmsg(mask_eroded_dilated_blue,
         encoding="passthrough"))
-
-    img, contours, hierarchy = cv2.findContours(
-        mask_eroded_dilated,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE)
 
     img_blue, contours_blue, hierarchy = cv2.findContours(
         mask_eroded_dilated_blue,
         cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE)
-    #contours_blue = imutils.grab_contours(contours_blue)
 
-    img_green, contours_green, hierarchy = cv2.findContours(
-        mask_eroded_dilated_green,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE)
-
-    return contours, mask_eroded_dilated, contours_blue, mask_eroded_dilated_blue, contours_green, mask_eroded_dilated_green
+    return contours_blue, mask_eroded_dilated_blue
 
 def rosRGBDCallBack(rgb_data, depth_data):
     draw_contours = True
@@ -180,136 +163,7 @@ def rosRGBDCallBack(rgb_data, depth_data):
     except CvBridgeError as e:
         print(e)
 
-    contours, mask_image, contours_blue, mask_image_blue, contours_green, mask_image_green = HSVObjectDetection(cv_image, toPrint = False)
-
-
-    for cnt in contours:
-        if not draw_contours:
-            xp,yp,w,h = cv2.boundingRect(cnt)
-
-            cv2.rectangle(cv_image,(xp,yp),(xp+w,yp+h),[0,255,255],2)
-            cv2.circle(cv_image,(int(xp+w/2),int(yp+h/2)),5,(55,255,155),4)
-            if not math.isnan(cv_depthimage2[int(yp+h/2)][int(xp+w/2)]) :
-                zc = cv_depthimage2[int(yp+h/2)][int(xp+w/2)]
-                X1 = getXYZ(xp+w/2, yp+h/2, zc, fx, fy, cx, cy)
-                print "x:",X1[0],"y:",X1[1],"z:",X1[2]
-            else:
-                continue
-        else:
-            #################Draw contours#####################################
-            # In task1, you need to call the function "cv2.drawContours" to show
-            # object contour in RVIZ
-            #
-            #
-            cv2.drawContours(cv_image, contours, -1, (0, 25, 60), -1)
-            #x_str_red, y_str_red = cnt[0][0][:]
-            #font_red = cv2.FONT_HERSHEY_SIMPLEX
-            #cv2.putText(cv_image, "Red", (x_str_red, y_str_red), font_red, 1, (0, 255, 255), 2, cv2.LINE_AA)
-            M_red = cv2.moments(cnt)
-            cX_red = int(M_red["m10"] / M_red["m00"])
-            cY_red = int(M_red["m01"] / M_red["m00"])
-            cv2.circle(cv_image, (cX_red, cY_red), 10, (1, 227, 254), -1)
-
-            c = max(contours, key=cv2.contourArea)
-            extRight = tuple(c[c[:, :, 0].argmax()][0])
-            #cv2.circle(cv_image, extRight, 5, (0, 255, 0), -1)
-
-            #if (len(cnt) >= 5):
-                #ellipse = cv2.fitEllipse(cnt)
-                #cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
-
-            if (len(cnt) >= 5):
-                ellipse = cv2.fitEllipse(cnt)
-                cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
-
-                (x,y),(MA,ma),angle = cv2.fitEllipse(cnt)
-                if (angle >= 90) and (angle <= 180):
-                    angle = angle - 90
-                    ell_x = int(x + 40*math.cos(angle*0.0174532925))
-                    ell_y = int(y + 40*math.sin(angle*0.0174532925))
-                    ell_x_short = int(x + 40*math.sin(angle*0.0174532925))
-                    ell_y_short = int(y - 40*math.cos(angle*0.0174532925))
-                else :
-                    ell_x = int(x + 40*math.sin(angle*0.0174532925))
-                    ell_y = int(y - 40*math.cos(angle*0.0174532925))
-                    ell_x_short = int(x - 40*math.cos(angle*0.0174532925))
-                    ell_y_short = int(y - 40*math.sin(angle*0.0174532925))
-
-                cv2.line(cv_image, (cX_red, cY_red), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
-                cv2.line(cv_image, (cX_red, cY_red), (cX_red, cY_red-40), (255,0,0), 3)             # z-axis
-                cv2.line(cv_image, (cX_red, cY_red), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
-            ###################################################################
-
-            if detect_shape:
-
-                peri = cv2.arcLength(cnt, True)
-                obj_num = cv2.approxPolyDP(cnt, 0.04 * peri, True)
-
-                if len(obj_num) == 3:
-                    obj_shape = "triangle"
-                elif len(obj_num) == 4:
-                    obj_shape = "square"
-                else:
-                    obj_shape = "circle"
-
-                if len(cnt) < 1:
-                    continue
-                x_str, y_str = cnt[0][0][:]
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                if obj_shape == "triangle":
-                    cv2.putText(cv_image, "Triangle", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-                elif obj_shape == "square":
-                    cv2.putText(cv_image, "Square", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-                elif obj_shape == "circle":
-                    cv2.putText(cv_image, "Circle", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-
-
-            if calculate_size:
-                ##################################################
-                # In task3, we offer the methods to calculate area.
-                # If you want to use the method TA offers, you will need to
-                # assign vertex list of single object to "vtx_list" and finish
-                # functions "get_side_length", "get_radius".
-                # You can also write your own code to calculate
-                # area. if so, please ignore and comment the line 193 - 218,
-                # and write your code there.
-                #
-                #
-                # vtx_list = ?? #hint: vtx_list is similar to cnt
-                ##################################################
-                vtx_list_tri = cv2.approxPolyDP(cnt, 0.2 * peri, True)
-                vtx_list_squ = cv2.approxPolyDP(cnt, 0.1 * peri, True)
-                vtx_list_cir = cv2.approxPolyDP(cnt, 0.2 * peri, True)
-                #print(vtx_list)
-                if obj_shape == "triangle":
-                    tri_side_len = get_side_length(vtx_list_tri, cv_depthimage2)
-                    if tri_side_len is None:
-                        continue
-                    tri_area = tri_side_len**2 * math.sqrt(3) / 4
-                    string = "%.3e" % tri_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
-
-                elif obj_shape == "square":
-                    squ_side_len = get_side_length(vtx_list_squ, cv_depthimage2)
-                    if squ_side_len is None:
-                        continue
-                    squ_area = squ_side_len**2
-                    string = "%.3e" % squ_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
-
-                elif obj_shape == "circle":
-                    circle_radius = get_radius(vtx_list_cir, cv_depthimage2)
-                    if circle_radius is None:
-                        continue
-                    circle_area = circle_radius**2 * math.pi
-                    string = "%.3e" % circle_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
+    contours_blue, mask_image_blue = HSVObjectDetection(cv_image, toPrint = False)
 
     for cnt in contours_blue:
         if not draw_contours:
@@ -362,21 +216,30 @@ def rosRGBDCallBack(rgb_data, depth_data):
                 cv2.line(cv_image, (cX_blue, cY_blue), (ell_x, ell_y), (0,255,0), 3)                    # x-axis
                 cv2.line(cv_image, (cX_blue, cY_blue), (cX_blue, cY_blue-100), (255,0,0), 3)             # z-axis
                 cv2.line(cv_image, (cX_blue, cY_blue), (ell_x_short, ell_y_short), (0,0,255), 3)        # y-axix
-                '''
-                cZ_blue = depth[cX_blue][cY_blue]
-                xyz_blue = getXYZ(cX_blue, cY_blue, cZ_blue, fx, fy, cx, cy)
-                #print(xyz_blue)
-                command = Pose()
-                command.position.x = xyz_blue[0]
-                command.position.y = xyz_blue[1]
-                command.position.z = xyz_blue[2]
-                command.orientation.x = 0
-                command.orientation.y = 0.707
-                command.orientation.z = 0
-                command.orientation.w = 0.707
-                print(command)
-                robot_command_pub.publish(command)
-                '''
+
+                
+                if (cX_blue < len(depth) and cY_blue < len(depth[0])):
+            	    cZ_blue = depth[cX_blue][cY_blue]
+            	    xyz_blue = getXYZ(cX_blue, cY_blue, cZ_blue/1000, fx, fy, cx, cy)
+                    matrix = quaternion_matrix([0.926, 0.008, 0.377, -0.002])
+                    matrix[0][3] = 0.048
+                    matrix[1][3] = -0.007
+                    matrix[2][3] = 0.568
+                    xyz = np.array([xyz_blue[0], xyz_blue[1], xyz_blue[2], 1])
+                    final_xyz = matrix.dot(xyz)
+                    print(matrix)
+                    print(xyz)
+            	    print(final_xyz)
+            	    command = Pose()
+            	    command.position.x = xyz_blue[0]
+            	    command.position.y = xyz_blue[1]
+            	    command.position.z = xyz_blue[2]
+            	    command.orientation.x = 0
+            	    command.orientation.y = 0.707
+            	    command.orientation.z = 0
+            	    command.orientation.w = 0.707
+            	    #print(command)
+            	    robot_command_pub.publish(command)
             ###################################################################
 
             if detect_shape:
@@ -449,119 +312,6 @@ def rosRGBDCallBack(rgb_data, depth_data):
                     string = "%.3e" % circle_area
                     cv2.putText(cv_image, string, (x_str, y_str+30), font,
                         1, (0, 255, 255), 2, cv2.LINE_AA)
-
-    for cnt in contours_green:
-        if not draw_contours:
-            xp,yp,w,h = cv2.boundingRect(cnt)
-
-            cv2.rectangle(cv_image,(xp,yp),(xp+w,yp+h),[0,255,255],2)
-            cv2.circle(cv_image,(int(xp+w/2),int(yp+h/2)),5,(55,255,155),4)
-            if not math.isnan(cv_depthimage2[int(yp+h/2)][int(xp+w/2)]) :
-                zc = cv_depthimage2[int(yp+h/2)][int(xp+w/2)]
-                X1 = getXYZ(xp+w/2, yp+h/2, zc, fx, fy, cx, cy)
-                print "x:",X1[0],"y:",X1[1],"z:",X1[2]
-            else:
-                continue
-        else:
-            #################Draw contours#####################################
-            # In task1, you need to call the function "cv2.drawContours" to show
-            # object contour in RVIZ
-            #
-            #
-            cv2.drawContours(cv_image, contours_green, -1, (230, 25, 60), -1)
-            #x_str_green, y_str_green = cnt[0][0][:]
-            #font_green = cv2.FONT_HERSHEY_SIMPLEX
-            #cv2.putText(cv_image, "Green", (x_str_green, y_str_green), font_green, 1, (0, 255, 255), 2, cv2.LINE_AA)
-            M_green = cv2.moments(cnt)
-            cX_green = int(M_green["m10"] / M_green["m00"])
-            cY_green = int(M_green["m01"] / M_green["m00"])
-            cv2.circle(cv_image, (cX_green, cY_green), 10, (1, 227, 254), -1)
-
-            c = max(contours_green, key=cv2.contourArea)
-            extRight = tuple(c[c[:, :, 0].argmax()][0])
-            #cv2.circle(cv_image, extRight, 5, (0, 255, 0), -1)
-
-            if (len(cnt) >= 5):
-                ellipse = cv2.fitEllipse(cnt)
-                cv2.ellipse(cv_image, ellipse, (0, 255, 0), 2)
-
-            cv2.line(cv_image, (cX_green, cY_green), (cX_green+30, cY_green-15), (0,0,255), 3)
-            cv2.line(cv_image, (cX_green, cY_green), (cX_green+30, cY_green), (0,255,0), 3)
-            cv2.line(cv_image, (cX_green, cY_green), (cX_green, cY_green-30), (255,0,0), 3)     
-            ###################################################################
-
-            if detect_shape:
-
-                peri = cv2.arcLength(cnt, True)
-                obj_num = cv2.approxPolyDP(cnt, 0.04 * peri, True)
-
-                if len(obj_num) == 3:
-                    obj_shape = "triangle"
-                elif len(obj_num) == 4:
-                    obj_shape = "square"
-                else:
-                    obj_shape = "circle"
-
-                if len(cnt) < 1:
-                    continue
-                x_str, y_str = cnt[0][0][:]
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                if obj_shape == "triangle":
-                    cv2.putText(cv_image, "Triangle", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-                elif obj_shape == "square":
-                    cv2.putText(cv_image, "Square", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-                elif obj_shape == "circle":
-                    cv2.putText(cv_image, "Circle", (x_str, y_str), font, 1,
-                        (0, 255, 255), 2, cv2.LINE_AA)
-
-
-            if calculate_size:
-                ##################################################
-                # In task3, we offer the methods to calculate area.
-                # If you want to use the method TA offers, you will need to
-                # assign vertex list of single object to "vtx_list" and finish
-                # functions "get_side_length", "get_radius".
-                # You can also write your own code to calculate
-                # area. if so, please ignore and comment the line 193 - 218,
-                # and write your code there.
-                #
-                #
-                # vtx_list = ?? #hint: vtx_list is similar to cnt
-                ##################################################
-                vtx_list_tri = cv2.approxPolyDP(cnt, 0.2 * peri, True)
-                vtx_list_squ = cv2.approxPolyDP(cnt, 0.1 * peri, True)
-                vtx_list_cir = cv2.approxPolyDP(cnt, 0.2 * peri, True)
-                #print(vtx_list)
-                if obj_shape == "triangle":
-                    tri_side_len = get_side_length(vtx_list_tri, cv_depthimage2)
-                    if tri_side_len is None:
-                        continue
-                    tri_area = tri_side_len**2 * math.sqrt(3) / 4
-                    string = "%.3e" % tri_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
-
-                elif obj_shape == "square":
-                    squ_side_len = get_side_length(vtx_list_squ, cv_depthimage2)
-                    if squ_side_len is None:
-                        continue
-                    squ_area = squ_side_len**2
-                    string = "%.3e" % squ_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
-
-                elif obj_shape == "circle":
-                    circle_radius = get_radius(vtx_list_cir, cv_depthimage2)
-                    if circle_radius is None:
-                        continue
-                    circle_area = circle_radius**2 * math.pi
-                    string = "%.3e" % circle_area
-                    cv2.putText(cv_image, string, (x_str, y_str+30), font,
-                        1, (0, 255, 255), 2, cv2.LINE_AA)
-
-
 
     img_result_pub.publish(cv_bridge.cv2_to_imgmsg(cv_image,
         encoding="passthrough"))
